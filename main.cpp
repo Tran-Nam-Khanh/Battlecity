@@ -49,10 +49,10 @@ public:
         dx = dirX;
         dy = dirY;
         active = true;
-        scaleFactor = 2.0f; // Tăng kích thước bullet lên 2 lần
-        int baseSize = 10; // Kích thước cơ bản
-        int scaledSize = static_cast<int>(baseSize * scaleFactor); // Kích thước mới
-        rect = { x, y, scaledSize, scaledSize }; // Đã sửa lỗi "tempat"
+        scaleFactor = 2.0f;
+        int baseSize = 10;
+        int scaledSize = static_cast<int>(baseSize * scaleFactor);
+        rect = { x, y, scaledSize, scaledSize };
     }
 
     void move() {
@@ -80,23 +80,32 @@ public:
     int dirX, dirY;
     SDL_Rect rect;
     float scaleFactor;
+    double angle; // Góc xoay của xe tăng
 
     PlayerTank(int startX, int startY) {
         x = startX;
         y = startY;
-        scaleFactor = 1.5f; // Tăng kích thước tank lên 1.5 lần
-        int scaledSize = static_cast<int>(TILE_SIZE * scaleFactor); // Kích thước mới
-        rect = { x * TILE_SIZE, y * TILE_SIZE, scaledSize, scaledSize }; // Áp dụng kích thước mới
+        scaleFactor = 1.5f;
+        int scaledSize = static_cast<int>(TILE_SIZE * scaleFactor);
+        rect = { x * TILE_SIZE, y * TILE_SIZE, scaledSize, scaledSize };
         dirX = 0;
-        dirY = -1;
+        dirY = -1; // Hướng mặc định: lên
+        angle = 0.0; // Góc mặc định: 0 độ (hướng lên)
     }
 
     void move(int dx, int dy, const vector<Wall>& walls) {
         int newX = x + dx;
         int newY = y + dy;
 
+        // Cập nhật hướng và góc xoay
         dirX = dx;
         dirY = dy;
+        if (dirX == 0 && dirY == -1) angle = 0.0;    // Lên
+        else if (dirX == 0 && dirY == 1) angle = 180.0; // Xuống
+        else if (dirX == -1 && dirY == 0) angle = 270.0; // Trái (Sửa 90.0 thành 270.0)
+        else if (dirX == 1 && dirY == 0) angle = 90.0;  // Phải (Sửa 270.0 thành 90.0)
+
+ 
 
         int scaledSize = static_cast<int>(TILE_SIZE * scaleFactor);
         SDL_Rect newRect = { newX * TILE_SIZE, newY * TILE_SIZE, scaledSize, scaledSize };
@@ -118,7 +127,7 @@ public:
 
     Bullet shoot() {
         int scaledSize = static_cast<int>(TILE_SIZE * scaleFactor);
-        int bulletX = x * TILE_SIZE + scaledSize / 2 - static_cast<int>(10 * 2.0f / 2); // Đạn xuất phát từ giữa tank
+        int bulletX = x * TILE_SIZE + scaledSize / 2 - static_cast<int>(10 * 2.0f / 2);
         int bulletY = y * TILE_SIZE + scaledSize / 2 - static_cast<int>(10 * 2.0f / 2);
 
         int bulletSpeed = 5;
@@ -127,14 +136,14 @@ public:
 
         if (dirX == 0 && dirY == 0) {
             bulletDirX = 0;
-            bulletDirY = -bulletSpeed;
+            bulletDirY = -bulletSpeed; // Mặc định bắn lên nếu không có hướng
         }
 
         return Bullet(bulletX, bulletY, bulletDirX, bulletDirY);
     }
 
     void render(SDL_Renderer* renderer, SDL_Texture* tankTexture) {
-        SDL_RenderCopy(renderer, tankTexture, NULL, &rect);
+        SDL_RenderCopyEx(renderer, tankTexture, NULL, &rect, angle, NULL, SDL_FLIP_NONE);
     }
 };
 
@@ -147,32 +156,35 @@ public:
     bool active;
     vector<Bullet> bullets;
     float scaleFactor;
+    double angle; // Góc xoay của xe tăng
 
-    EnemyTank(int startX, int startY) {
-        moveDelay = 15;
-        shootDelay = 100;
-        x = startX;
-        y = startY;
-        scaleFactor = 1.5f; // Tăng kích thước tank lên 1.5 lần
-        int scaledSize = static_cast<int>(TILE_SIZE * scaleFactor); // Kích thước mới
-        rect = { x * TILE_SIZE, y * TILE_SIZE, scaledSize, scaledSize }; // Áp dụng kích thước mới
-        dirX = 0;
-        dirY = 1;
-        active = true;
-    }
+    
+	EnemyTank(int startX, int startY) {
+		x = startX;
+		y = startY;
+		scaleFactor = 1.5f;
+		int scaledSize = static_cast<int>(TILE_SIZE * scaleFactor);
+		rect = { x * TILE_SIZE, y * TILE_SIZE, scaledSize, scaledSize };
+		dirX = 0;
+		dirY = 1; // Hướng mặc định: xuống
+		angle = 180.0; // Góc mặc định: 180 độ (hướng xuống)
+		moveDelay = 15;
+		shootDelay = 25;
+		active = true;
+	}
 
     void move(const vector<Wall>& walls) {
         if (--moveDelay > 0) return;
         moveDelay = 15;
 
         int r = rand() % 4;
-        if (r == 0) { dirX = 0; dirY = -1; }
-        else if (r == 1) { dirX = 0; dirY = 1; }
-        else if (r == 2) { dirY = 0; dirX = -1; }
-        else if (r == 3) { dirY = 0; dirX = 1; }
+        if (r == 0) { dirX = 0; dirY = -1; angle = 0.0; }    // Lên
+        else if (r == 1) { dirX = 0; dirY = 1; angle = 180.0; } // Xuống
+        else if (r == 2) { dirX = -1; dirY = 0; angle = 90.0; } // Trái
+        else if (r == 3) { dirX = 1; dirY = 0; angle = -90.0; } // Phải
 
-        int newX = x + this->dirX;
-        int newY = y + this->dirY;
+        int newX = x + dirX;
+        int newY = y + dirY;
 
         int scaledSize = static_cast<int>(TILE_SIZE * scaleFactor);
         SDL_Rect newRect = { newX * TILE_SIZE, newY * TILE_SIZE, scaledSize, scaledSize };
@@ -194,7 +206,7 @@ public:
 
     void shoot() {
         if (--shootDelay > 0) return;
-        shootDelay = 15;
+        shootDelay = 25;
 
         int scaledSize = static_cast<int>(TILE_SIZE * scaleFactor);
         bullets.push_back(Bullet(
@@ -217,23 +229,25 @@ public:
 
     void render(SDL_Renderer* renderer, SDL_Texture* tankTexture, SDL_Texture* bulletTexture) {
         if (active) {
-            SDL_RenderCopy(renderer, tankTexture, NULL, &rect);
+            SDL_RenderCopyEx(renderer, tankTexture, NULL, &rect, angle, NULL, SDL_FLIP_NONE);
             for (auto& bullet : bullets) {
                 bullet.render(renderer, bulletTexture);
             }
         }
     }
 };
+
 enum GameState {
     MENU,
     GAMEPLAY
 };
+
 class Game {
 public:
     SDL_Window* window;
     SDL_Renderer* renderer;
     bool running;
-    GameState state; // New: Track game state
+    GameState state;
     vector<Wall> walls;
     vector<Bullet> bullets;
     int enemyNumber = 3;
@@ -241,12 +255,12 @@ public:
     PlayerTank player;
     SDL_Texture* tankTexture;
     SDL_Texture* bulletTexture;
-    TTF_Font* font; // New: For menu text
-    SDL_Texture* startTextTexture; // New: Texture for "Start" text
+    TTF_Font* font;
+    SDL_Texture* startTextTexture;
 
     Game() : player(MAP_WIDTH / 2, MAP_HEIGHT - 2) {
         running = true;
-        state = MENU; // Start in menu state
+        state = MENU;
 
         if (SDL_Init(SDL_INIT_VIDEO) < 0) {
             cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << endl;
@@ -265,21 +279,18 @@ public:
             running = false;
         }
 
-        // Initialize SDL_ttf
         if (TTF_Init() == -1) {
             cerr << "SDL_ttf could not initialize! TTF_Error: " << TTF_GetError() << endl;
             running = false;
         }
 
-        // Load font (adjust path to a valid .ttf file on your system)
-        font = TTF_OpenFont("C:/Windows/Fonts/arial.ttf", 40); // Example path, replace with your font path
+        font = TTF_OpenFont("C:/Windows/Fonts/arial.ttf", 40);
         if (!font) {
             cerr << "Failed to load font! TTF_Error: " << TTF_GetError() << endl;
             running = false;
         }
 
-        // Create "Start" text texture
-        SDL_Color textColor = { 255, 255, 255, 255 }; // White text
+        SDL_Color textColor = { 255, 255, 255, 255 };
         SDL_Surface* textSurface = TTF_RenderText_Solid(font, "Start", textColor);
         if (!textSurface) {
             cerr << "Failed to create text surface! TTF_Error: " << TTF_GetError() << endl;
@@ -288,8 +299,7 @@ public:
         startTextTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
         SDL_FreeSurface(textSurface);
 
-        // Load textures
-        tankTexture = IMG_LoadTexture(renderer, "C:/Users/NAM KHANH/OneDrive/Pictures/Screenshots/sdl2/sdl2/Project1/x64/Debug/tank.png");
+        tankTexture = IMG_LoadTexture(renderer, "C:/Users/NAM KHANH/OneDrive/Pictures/Screenshots/sdl2/sdl2/Project1/x64/tanks.png");
         if (!tankTexture) {
             cerr << "Failed to load tank texture! SDL_Error: " << SDL_GetError() << endl;
             running = false;
@@ -340,7 +350,7 @@ public:
             }
             if (state == MENU) {
                 if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN) {
-                    state = GAMEPLAY; // Start game on Enter key
+                    state = GAMEPLAY;
                 }
             }
             else if (state == GAMEPLAY) {
@@ -407,6 +417,7 @@ public:
                     enemy.updateBullets();
 
                     if (SDL_HasIntersection(&player.rect, &enemy.rect)) {
+                        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Game Over", "You Lose", window);
                         running = false;
                     }
 
@@ -449,11 +460,10 @@ public:
     }
 
     void render() {
-        SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255); // Gray background
+        SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
         SDL_RenderClear(renderer);
 
         if (state == MENU) {
-            // Render "Start" text in the center
             int textW, textH;
             SDL_QueryTexture(startTextTexture, NULL, NULL, &textW, &textH);
             SDL_Rect textRect = { (SCREEN_WIDTH - textW) / 2, (SCREEN_HEIGHT - textH) / 2, textW, textH };
